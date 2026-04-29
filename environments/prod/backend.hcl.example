@@ -1,0 +1,9 @@
+# Fill these values from `terraform -chdir=global/backend output backend_hcl_values`
+# then run:
+# terraform init -backend-config=backend.hcl -migrate-state
+
+bucket       = "oplust-tfstate-123456789012-ap-northeast-2"
+key          = "oplust/prod/terraform.tfstate"
+region       = "ap-northeast-2"
+use_lockfile = true
+encrypt      = true
