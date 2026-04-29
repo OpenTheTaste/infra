@@ -1,4 +1,4 @@
-module "app_stack" {
+module "orchestrator" {
   source = "../../stacks/app"
 
   providers = {

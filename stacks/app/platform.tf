@@ -167,6 +167,57 @@ module "monitoring_ec2_iam" {
   tags = local.common_tags
 }
 
+module "lambda_iam" {
+  count  = var.enable_lambda_worker ? 1 : 0
+  source = "../../modules/iam"
+
+  role_name = "${var.project}-${var.environment}-lambda-worker"
+
+  assume_role_service_principals = ["lambda.amazonaws.com"]
+  create_instance_profile        = false
+  create_inline_policy           = true
+  allow_ssm_parameter_read       = true
+  allow_ssm_parameter_write      = true
+  allow_secrets_manager_read     = true
+  allow_ecs_service_scale        = local.lambda_ecs_service_arn != null
+  ssm_parameter_arns             = values(module.lambda_parameters[0].parameter_arns)
+  ssm_parameter_write_arns       = [module.lambda_parameters[0].parameter_arns["last_scale_epoch"]]
+  secret_arns                    = [local.lambda_secret_arn]
+  ecs_service_arns               = local.lambda_ecs_service_arn == null ? [] : [local.lambda_ecs_service_arn]
+
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+  ]
+
+  tags = local.common_tags
+}
+
+module "rabbitmq_rotation_lambda_iam" {
+  count  = var.enable_rabbitmq_credentials_rotation ? 1 : 0
+  source = "../../modules/iam"
+
+  role_name = "${var.project}-${var.environment}-rabbitmq-rotation-lambda"
+
+  assume_role_service_principals = ["lambda.amazonaws.com"]
+  create_instance_profile        = false
+  create_inline_policy           = true
+  allow_ssm_parameter_read       = false
+  allow_ssm_parameter_write      = false
+  allow_secrets_manager_read     = true
+  allow_secrets_manager_rotation = true
+  allow_ecs_service_scale        = false
+  secret_arns                    = [local.rabbitmq_admin_secret_arn, local.lambda_secret_arn]
+  secret_rotation_arns           = [local.lambda_secret_arn]
+
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+  ]
+
+  tags = local.common_tags
+}
+
 module "rds" {
   source = "../../modules/rds"
 
