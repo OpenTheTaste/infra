@@ -7,7 +7,7 @@
 
 - `network.tf`: 기반 네트워크 리소스 (`ami`, `vpc`, `security_groups`)
 - `platform.tf`: 공용 플랫폼 리소스 (S3, ECS cluster/service, RDS, Secrets, IAM)
-- `app.tf`: 워크로드 실행 리소스 (admin/user EC2, RabbitMQ, monitoring, Lambda, EventBridge)
+- `workloads.tf`: 워크로드 실행 리소스 (admin/user EC2, RabbitMQ, monitoring, Lambda, EventBridge)
 - `edge.tf`: 외부 인입/노출 리소스 (Route53, ACM, ALB, CloudFront)
 - `main.tf`: 공통 `provider`/`data`/`locals`
 
