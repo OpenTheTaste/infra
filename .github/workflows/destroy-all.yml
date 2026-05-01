@@ -1,0 +1,200 @@
+name: Destroy Infra (dev + optional backend)
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: AWS region
+        required: false
+        default: ap-northeast-2
+      state_key:
+        description: Terraform state key for dev
+        required: false
+        default: oplust/dev/terraform.tfstate
+      destroy_backend:
+        description: Destroy global/backend after dev destroy (true/false)
+        required: true
+        default: "false"
+      confirm:
+        description: Type DESTROY to continue
+        required: true
+        default: ""
+
+env:
+  TF_IN_AUTOMATION: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  destroy-dev:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'DESTROY' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ github.event.inputs.aws_region || 'ap-northeast-2' }}
+
+      - name: Terraform Init (global/backend)
+        run: terraform -chdir=global/backend init
+
+      - name: Generate backend.hcl for dev from backend outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          terraform -chdir=global/backend output -json backend_hcl_values > /tmp/backend_values.json
+
+          BUCKET=$(jq -r '.bucket' /tmp/backend_values.json)
+          REGION=$(jq -r '.region' /tmp/backend_values.json)
+          USE_LOCKFILE=$(jq -r '.use_lockfile' /tmp/backend_values.json)
+
+          cat > environments/dev/backend.hcl <<EOF
+          bucket       = "${BUCKET}"
+          key          = "${{ github.event.inputs.state_key || 'oplust/dev/terraform.tfstate' }}"
+          region       = "${REGION}"
+          use_lockfile = ${USE_LOCKFILE}
+          encrypt      = true
+          EOF
+
+      - name: Terraform Init (dev)
+        run: terraform -chdir=environments/dev init -backend-config=backend.hcl -reconfigure
+
+      - name: Terraform Destroy Plan (dev)
+        run: terraform -chdir=environments/dev plan -destroy -out destroy.tfplan
+
+      - name: Terraform Destroy Apply (dev)
+        run: terraform -chdir=environments/dev apply -auto-approve destroy.tfplan
+
+  destroy-backend:
+    runs-on: ubuntu-latest
+    needs: destroy-dev
+    if: ${{ github.event.inputs.confirm == 'DESTROY' && github.event.inputs.destroy_backend == 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ github.event.inputs.aws_region || 'ap-northeast-2' }}
+
+      - name: Terraform Init (global/backend)
+        run: terraform -chdir=global/backend init
+
+      - name: Terraform Destroy Plan (global/backend)
+        run: terraform -chdir=global/backend plan -destroy -out destroy.tfplan
+
+      - name: Terraform Destroy Apply (global/backend)
+        run: terraform -chdir=global/backend apply -auto-approve destroy.tfplan
+
+  verify-no-leftovers:
+    runs-on: ubuntu-latest
+    needs:
+      - destroy-dev
+      - destroy-backend
+    if: ${{ always() && github.event.inputs.confirm == 'DESTROY' && (needs.destroy-dev.result == 'success') && (github.event.inputs.destroy_backend != 'true' || needs.destroy-backend.result == 'success') }}
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ github.event.inputs.aws_region || 'ap-northeast-2' }}
+
+      - name: Verify leftover resources
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROJECT="oplust"
+          ENV_NAME="dev"
+          REGION="${{ github.event.inputs.aws_region || 'ap-northeast-2' }}"
+          failures=0
+
+          check_count() {
+            local name="$1"
+            local count="$2"
+            echo "${name}: ${count}"
+            if [ "$count" -gt 0 ]; then
+              failures=$((failures+1))
+            fi
+          }
+
+          nat_count=$(aws ec2 describe-nat-gateways \
+            --region "$REGION" \
+            --filter Name=tag:Project,Values="$PROJECT" Name=tag:Env,Values="$ENV_NAME" Name=state,Values=available,pending \
+            --query 'length(NatGateways)' --output text)
+          check_count "NAT Gateways" "$nat_count"
+
+          eip_count=$(aws ec2 describe-addresses \
+            --region "$REGION" \
+            --query "length(Addresses[?Tags[?Key=='Project' && Value=='$PROJECT'] && Tags[?Key=='Env' && Value=='$ENV_NAME']])" --output text)
+          check_count "Elastic IPs" "$eip_count"
+
+          lb_count=$(aws elbv2 describe-load-balancers --region "$REGION" \
+            --query "length(LoadBalancers[?contains(LoadBalancerName, '$PROJECT-$ENV_NAME')])" --output text)
+          check_count "Load Balancers" "$lb_count"
+
+          rds_count=$(aws rds describe-db-instances --region "$REGION" \
+            --query "length(DBInstances[?contains(DBInstanceIdentifier, '$PROJECT-$ENV_NAME')])" --output text)
+          check_count "RDS Instances" "$rds_count"
+
+          ec2_count=$(aws ec2 describe-instances --region "$REGION" \
+            --filters Name=tag:Project,Values="$PROJECT" Name=tag:Env,Values="$ENV_NAME" Name=instance-state-name,Values=pending,running,stopping,stopped,shutting-down \
+            --query 'length(Reservations[].Instances[])' --output text)
+          check_count "EC2 Instances" "$ec2_count"
+
+          cluster_arns=$(aws ecs list-clusters --region "$REGION" --query 'clusterArns[]' --output text || true)
+          ecs_active=0
+          if [ -n "$cluster_arns" ]; then
+            for c in $cluster_arns; do
+              services=$(aws ecs list-services --cluster "$c" --region "$REGION" --query 'serviceArns[]' --output text || true)
+              for s in $services; do
+                if [[ "$s" == *"$PROJECT-$ENV_NAME"* ]]; then
+                  ecs_active=$((ecs_active+1))
+                fi
+              done
+            done
+          fi
+          check_count "ECS Services" "$ecs_active"
+
+          cf_count=$(aws cloudfront list-distributions \
+            --query "length(DistributionList.Items[?Comment=='$PROJECT-$ENV_NAME'])" --output text)
+          if [ "$cf_count" = "None" ]; then cf_count=0; fi
+          check_count "CloudFront Distributions" "$cf_count"
+
+          s3_count=$(aws s3api list-buckets \
+            --query "length(Buckets[?contains(Name, '$PROJECT-$ENV_NAME-media')])" --output text)
+          check_count "S3 Media Buckets" "$s3_count"
+
+          echo "----------------------------------------"
+          if [ "$failures" -gt 0 ]; then
+            echo "[FAIL] leftover billable resources detected: ${failures} category(ies)."
+            exit 1
+          else
+            echo "[PASS] no leftover resources detected for ${PROJECT}/${ENV_NAME}."
+          fi
+
+  guard:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm != 'DESTROY' }}
+    steps:
+      - name: Guard message
+        run: |
+          echo "Skipped: confirm input is not DESTROY."
+          exit 1

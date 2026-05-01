@@ -1,0 +1,70 @@
+name: Deploy Backend (global/backend)
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: AWS region for backend/bootstrap and dev init
+        required: false
+        default: ap-northeast-2
+      state_key:
+        description: Terraform state key for dev
+        required: false
+        default: oplust/dev/terraform.tfstate
+
+env:
+  TF_IN_AUTOMATION: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ github.event.inputs.aws_region || 'ap-northeast-2' }}
+
+      - name: Terraform Init (global/backend)
+        run: terraform -chdir=global/backend init
+
+      - name: Terraform Apply (global/backend)
+        run: terraform -chdir=global/backend apply -auto-approve
+
+      - name: Generate backend.hcl for dev from backend outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          terraform -chdir=global/backend output -json backend_hcl_values > /tmp/backend_values.json
+
+          BUCKET=$(jq -r '.bucket' /tmp/backend_values.json)
+          REGION=$(jq -r '.region' /tmp/backend_values.json)
+          USE_LOCKFILE=$(jq -r '.use_lockfile' /tmp/backend_values.json)
+
+          cat > environments/dev/backend.hcl <<EOF
+          bucket       = "${BUCKET}"
+          key          = "${{ github.event.inputs.state_key || 'oplust/dev/terraform.tfstate' }}"
+          region       = "${REGION}"
+          use_lockfile = ${USE_LOCKFILE}
+          encrypt      = true
+          EOF
+
+      - name: Terraform Init (dev, remote backend)
+        run: terraform -chdir=environments/dev init -backend-config=backend.hcl -reconfigure
+
+      - name: Show generated backend summary
+        run: |
+          echo "Backend initialization completed for environments/dev"
+          echo "State bucket/key used:"
+          cat environments/dev/backend.hcl
