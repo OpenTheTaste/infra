@@ -27,6 +27,8 @@ locals {
     "  - job_name: \"${replace(replace(replace(t.target, ":", "-"), ".", "-"), "/", "-")}\"\n    metrics_path: \"${t.metrics_path}\"\n    static_configs:\n      - targets: [\"${t.target}\"]"
   ])
 
+  grafana_admin_password_safe = var.grafana_admin_password != null ? var.grafana_admin_password : ""
+
   generated_user_data = <<-EOT
     #!/bin/bash
     set -euo pipefail
@@ -46,7 +48,7 @@ locals {
       GRAFANA_ADMIN_PASSWORD=$(echo "$SECRET_JSON" | jq -r '.password')
     else
       GRAFANA_ADMIN_USER='${var.grafana_admin_user}'
-      GRAFANA_ADMIN_PASSWORD='${var.grafana_admin_password}'
+      GRAFANA_ADMIN_PASSWORD='${local.grafana_admin_password_safe}'
     fi
 
     mkdir -p /opt/monitoring/prometheus /opt/monitoring/loki /opt/monitoring/grafana/provisioning/datasources

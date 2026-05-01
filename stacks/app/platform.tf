@@ -194,7 +194,7 @@ module "lambda_iam" {
 }
 
 module "rabbitmq_rotation_lambda_iam" {
-  count  = var.enable_rabbitmq_credentials_rotation ? 1 : 0
+  count  = var.enable_rabbitmq_credentials_rotation && local.lambda_secret_arn != null && local.rabbitmq_admin_secret_arn != null ? 1 : 0
   source = "../../modules/iam"
 
   role_name = "${var.project}-${var.environment}-rabbitmq-rotation-lambda"

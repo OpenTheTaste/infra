@@ -136,7 +136,7 @@ module "eventbridge" {
 }
 
 module "rabbitmq_rotation_lambda" {
-  count  = var.enable_rabbitmq_credentials_rotation ? 1 : 0
+  count  = var.enable_rabbitmq_credentials_rotation && local.lambda_secret_arn != null && local.rabbitmq_admin_secret_arn != null ? 1 : 0
   source = "../../modules/lambda_worker"
 
   name_prefix          = "${var.project}-${var.environment}"
@@ -160,7 +160,7 @@ module "rabbitmq_rotation_lambda" {
 }
 
 resource "aws_lambda_permission" "allow_secretsmanager_rotation" {
-  count = var.enable_rabbitmq_credentials_rotation ? 1 : 0
+  count = var.enable_rabbitmq_credentials_rotation && local.lambda_secret_arn != null && local.rabbitmq_admin_secret_arn != null ? 1 : 0
 
   statement_id  = "AllowExecutionFromSecretsManagerRotation"
   action        = "lambda:InvokeFunction"
@@ -170,7 +170,7 @@ resource "aws_lambda_permission" "allow_secretsmanager_rotation" {
 }
 
 resource "aws_secretsmanager_secret_rotation" "rabbitmq_credentials" {
-  count = var.enable_rabbitmq_credentials_rotation ? 1 : 0
+  count = var.enable_rabbitmq_credentials_rotation && local.lambda_secret_arn != null && local.rabbitmq_admin_secret_arn != null ? 1 : 0
 
   secret_id           = local.lambda_secret_arn
   rotation_lambda_arn = module.rabbitmq_rotation_lambda[0].function_arn
