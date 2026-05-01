@@ -119,6 +119,7 @@ module "app_ec2_iam" {
   source = "../../modules/iam"
 
   role_name = "${var.project}-${var.environment}-ec2-app"
+  create_inline_policy = false
 
   managed_policy_arns = [
     "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"

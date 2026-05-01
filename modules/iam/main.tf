@@ -127,7 +127,7 @@ resource "aws_iam_role_policy_attachment" "managed" {
 }
 
 resource "aws_iam_role_policy" "inline" {
-  count = var.create_inline_policy && local.inline_statement_count > 0 ? 1 : 0
+  count = var.create_inline_policy ? 1 : 0
 
   name   = "${var.role_name}-inline"
   role   = aws_iam_role.this.id
