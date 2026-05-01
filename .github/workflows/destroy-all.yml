@@ -192,9 +192,14 @@ jobs:
           fi
           check_count "ECS Services" "$ecs_active"
 
+          set +e
           cf_count=$(aws cloudfront list-distributions \
-            --query "length(DistributionList.Items[?Comment=='$PROJECT-$ENV_NAME'])" --output text)
-          if [ "$cf_count" = "None" ]; then cf_count=0; fi
+            --query "length(DistributionList.Items[?Comment=='$PROJECT-$ENV_NAME'])" --output text 2>/dev/null)
+          cf_status=$?
+          set -e
+          if [ $cf_status -ne 0 ] || [ -z "$cf_count" ] || [ "$cf_count" = "None" ] || [ "$cf_count" = "null" ]; then
+            cf_count=0
+          fi
           check_count "CloudFront Distributions" "$cf_count"
 
           s3_count=$(aws s3api list-buckets \
