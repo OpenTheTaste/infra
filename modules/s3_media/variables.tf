@@ -83,6 +83,11 @@ variable "cors_allowed_origins" {
   description = "Allowed origins for CORS."
   type        = list(string)
   default     = []
+
+  validation {
+    condition     = var.enable_cors ? length(var.cors_allowed_origins) > 0 : true
+    error_message = "cors_allowed_origins must contain at least one origin when enable_cors is true."
+  }
 }
 
 variable "cors_allowed_methods" {

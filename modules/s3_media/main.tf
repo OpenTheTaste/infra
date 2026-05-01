@@ -57,7 +57,7 @@ resource "aws_s3_bucket_public_access_block" "this" {
 }
 
 resource "aws_s3_bucket_cors_configuration" "this" {
-  count = var.enable_cors ? 1 : 0
+  count = var.enable_cors && length(var.cors_allowed_origins) > 0 ? 1 : 0
 
   bucket = aws_s3_bucket.this.id
 
