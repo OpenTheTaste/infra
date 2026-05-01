@@ -222,12 +222,19 @@ jobs:
             aws ec2 delete-nat-gateway --region "$REGION" --nat-gateway-id "$n" >/dev/null 2>&1 || true
           done
 
-          # Release EIP (disassociated only)
-          allocs=$(aws ec2 describe-addresses --region "$REGION" \
-            --query "Addresses[?AssociationId==null && Tags[?Key=='Project' && Value=='$PROJECT'] && Tags[?Key=='Env' && Value=='$ENV_NAME']].AllocationId" --output text || true)
-          for a in $allocs; do
-            aws ec2 release-address --region "$REGION" --allocation-id "$a" >/dev/null 2>&1 || true
-          done
+          # Release EIP (disassociate first if still attached)
+          eip_pairs=$(aws ec2 describe-addresses --region "$REGION" \
+            --query "Addresses[?Tags[?Key=='Project' && Value=='$PROJECT'] && Tags[?Key=='Env' && Value=='$ENV_NAME']].[AllocationId,AssociationId]" \
+            --output text || true)
+          if [ -n "$eip_pairs" ]; then
+            while read -r alloc assoc; do
+              [ -z "${alloc:-}" ] && continue
+              if [ -n "${assoc:-}" ] && [ "$assoc" != "None" ] && [ "$assoc" != "null" ]; then
+                aws ec2 disassociate-address --region "$REGION" --association-id "$assoc" >/dev/null 2>&1 || true
+              fi
+              aws ec2 release-address --region "$REGION" --allocation-id "$alloc" >/dev/null 2>&1 || true
+            done <<< "$eip_pairs"
+          fi
 
           # IAM roles by prefix
           roles=$(aws iam list-roles --query "Roles[?contains(RoleName, '$PREFIX')].RoleName" --output text || true)
