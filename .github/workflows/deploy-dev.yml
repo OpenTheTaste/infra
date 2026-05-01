@@ -7,6 +7,18 @@ on:
         description: AWS region
         required: false
         default: ap-northeast-2
+      project:
+        description: Terraform variable project
+        required: false
+        default: oplust
+      environment:
+        description: Terraform variable environment
+        required: false
+        default: dev
+      base_domain:
+        description: Terraform variable base_domain
+        required: true
+        default: openthetaste.cloud
       state_key:
         description: Terraform state key for dev
         required: false
@@ -18,6 +30,7 @@ on:
 
 env:
   TF_IN_AUTOMATION: true
+  TF_INPUT: false
 
 permissions:
   id-token: write
@@ -70,7 +83,7 @@ jobs:
         run: terraform -chdir=environments/dev validate
 
       - name: Terraform Plan (dev)
-        run: terraform -chdir=environments/dev plan -out tfplan
+        run: terraform -chdir=environments/dev plan -var="aws_region=${{ github.event.inputs.aws_region || 'ap-northeast-2' }}" -var="project=${{ github.event.inputs.project || 'oplust' }}" -var="environment=${{ github.event.inputs.environment || 'dev' }}" -var="base_domain=${{ github.event.inputs.base_domain || 'openthetaste.cloud' }}" -out tfplan
 
       - name: Terraform Apply (dev)
         run: terraform -chdir=environments/dev apply -auto-approve tfplan

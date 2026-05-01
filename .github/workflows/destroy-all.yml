@@ -7,6 +7,18 @@ on:
         description: AWS region
         required: false
         default: ap-northeast-2
+      project:
+        description: Terraform variable project
+        required: false
+        default: oplust
+      environment:
+        description: Terraform variable environment
+        required: false
+        default: dev
+      base_domain:
+        description: Terraform variable base_domain
+        required: true
+        default: openthetaste.cloud
       state_key:
         description: Terraform state key for dev
         required: false
@@ -77,7 +89,7 @@ jobs:
         run: terraform -chdir=environments/dev init -backend-config=backend.hcl -reconfigure
 
       - name: Terraform Destroy Plan (dev)
-        run: terraform -chdir=environments/dev plan -destroy -var="aws_region=${{ github.event.inputs.aws_region || 'ap-northeast-2' }}" -out destroy.tfplan
+        run: terraform -chdir=environments/dev plan -destroy -var="aws_region=${{ github.event.inputs.aws_region || 'ap-northeast-2' }}" -var="project=${{ github.event.inputs.project || 'oplust' }}" -var="environment=${{ github.event.inputs.environment || 'dev' }}" -var="base_domain=${{ github.event.inputs.base_domain || 'openthetaste.cloud' }}" -out destroy.tfplan
 
       - name: Terraform Destroy Apply (dev)
         run: terraform -chdir=environments/dev apply -auto-approve destroy.tfplan
