@@ -39,6 +39,26 @@ jobs:
       - name: Terraform Init (global/backend)
         run: terraform -chdir=global/backend init
 
+      - name: Import existing backend bucket resources if already exists
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGION="${{ github.event.inputs.aws_region || 'ap-northeast-2' }}"
+          BUCKET="oplust-tfstate-${ACCOUNT_ID}-${REGION}"
+
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "Existing bucket detected: $BUCKET"
+            terraform -chdir=global/backend import aws_s3_bucket.state "$BUCKET" || true
+            terraform -chdir=global/backend import aws_s3_bucket_versioning.state "$BUCKET" || true
+            terraform -chdir=global/backend import aws_s3_bucket_server_side_encryption_configuration.state "$BUCKET" || true
+            terraform -chdir=global/backend import aws_s3_bucket_public_access_block.state "$BUCKET" || true
+            terraform -chdir=global/backend import aws_s3_bucket_ownership_controls.state "$BUCKET" || true
+          else
+            echo "No existing bucket found. Terraform will create it."
+          fi
+
       - name: Terraform Apply (global/backend)
         run: terraform -chdir=global/backend apply -auto-approve
 
