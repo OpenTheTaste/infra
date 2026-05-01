@@ -31,7 +31,7 @@ variable "media_enable_lifecycle_rule" {
 
 variable "media_enable_cors" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "media_cors_allowed_origins" {
