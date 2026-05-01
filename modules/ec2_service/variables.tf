@@ -48,6 +48,12 @@ variable "security_group_id" {
   default     = null
 }
 
+variable "create_security_group" {
+  description = "Whether this module should create a security group. When false, security_group_id should be provided by caller."
+  type        = bool
+  default     = false
+}
+
 variable "additional_security_group_ids" {
   description = "Additional security groups to attach to instance."
   type        = list(string)

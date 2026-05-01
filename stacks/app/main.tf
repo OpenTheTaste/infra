@@ -58,9 +58,9 @@ locals {
     Env     = var.environment
   }
 
-  lambda_secret_arn             = coalesce(var.lambda_rabbitmq_credentials_secret_arn, try(aws_secretsmanager_secret.lambda_rabbitmq_credentials[0].arn, null))
-  rabbitmq_admin_secret_arn     = coalesce(var.rabbitmq_admin_credentials_secret_arn, try(aws_secretsmanager_secret.rabbitmq_admin_credentials[0].arn, null))
-  monitoring_grafana_secret_arn = coalesce(var.monitoring_grafana_admin_secret_arn, try(aws_secretsmanager_secret.monitoring_grafana_admin_credentials[0].arn, null))
+  lambda_secret_arn             = var.lambda_rabbitmq_credentials_secret_arn != null ? var.lambda_rabbitmq_credentials_secret_arn : try(aws_secretsmanager_secret.lambda_rabbitmq_credentials[0].arn, null)
+  rabbitmq_admin_secret_arn     = var.rabbitmq_admin_credentials_secret_arn != null ? var.rabbitmq_admin_credentials_secret_arn : try(aws_secretsmanager_secret.rabbitmq_admin_credentials[0].arn, null)
+  monitoring_grafana_secret_arn = var.monitoring_grafana_admin_secret_arn != null ? var.monitoring_grafana_admin_secret_arn : try(aws_secretsmanager_secret.monitoring_grafana_admin_credentials[0].arn, null)
 
   monitoring_auto_scrape_targets = [
     { target = "${module.admin_ec2.private_ip}:8081", metrics_path = "/actuator/prometheus" },

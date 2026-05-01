@@ -19,7 +19,7 @@ locals {
     var.tags
   )
 
-  primary_security_group_id = var.security_group_id == null ? aws_security_group.this[0].id : var.security_group_id
+  primary_security_group_id = var.create_security_group ? aws_security_group.this[0].id : var.security_group_id
 }
 
 resource "aws_db_subnet_group" "this" {
@@ -30,7 +30,7 @@ resource "aws_db_subnet_group" "this" {
 }
 
 resource "aws_security_group" "this" {
-  count = var.security_group_id == null ? 1 : 0
+  count = var.create_security_group ? 1 : 0
 
   name_prefix = "${var.identifier}-rds-sg-"
   description = "Security group for RDS ${var.identifier}"

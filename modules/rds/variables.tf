@@ -19,6 +19,12 @@ variable "security_group_id" {
   default     = null
 }
 
+variable "create_security_group" {
+  description = "Whether this module should create a DB security group. When false, security_group_id should be provided by caller."
+  type        = bool
+  default     = false
+}
+
 variable "engine" {
   description = "Database engine (postgres, mysql, mariadb, etc.)."
   type        = string
