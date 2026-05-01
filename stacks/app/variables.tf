@@ -101,13 +101,6 @@ variable "cloudfront_signed_cookie_public_key_id" {
   description = "CloudFront public key ID used by backend when issuing Signed Cookies (CloudFront-Key-Pair-Id)."
   type        = string
   default     = null
-
-  validation {
-    condition = (
-      var.media_cloudfront_enable_signed_cookies && var.create_cloudfront_auth_parameters
-    ) ? var.cloudfront_signed_cookie_public_key_id != null : true
-    error_message = "cloudfront_signed_cookie_public_key_id is required when signed cookies and auth parameters are enabled."
-  }
 }
 
 variable "admin_subdomain" {
@@ -132,13 +125,6 @@ variable "enable_lambda_worker" {
   description = "Whether to create the worker Lambda function."
   type        = bool
   default     = false
-
-  validation {
-    condition = var.enable_lambda_worker ? (
-      var.enable_ecs_transcoder || (var.lambda_ecs_cluster_name != null && var.lambda_ecs_service_name != null)
-    ) : true
-    error_message = "When enable_lambda_worker is true, either enable_ecs_transcoder=true or provide both lambda_ecs_cluster_name and lambda_ecs_service_name."
-  }
 }
 
 variable "enable_ecs_transcoder" {
@@ -187,11 +173,6 @@ variable "lambda_package_file" {
   description = "Path to the worker Lambda zip package. Required when enable_lambda_worker is true."
   type        = string
   default     = null
-
-  validation {
-    condition     = var.enable_lambda_worker ? var.lambda_package_file != null : true
-    error_message = "lambda_package_file is required when enable_lambda_worker is true."
-  }
 }
 
 variable "lambda_rabbitmq_credentials_secret_arn" {
@@ -204,11 +185,6 @@ variable "create_lambda_rabbitmq_credentials_secret" {
   description = "Create RabbitMQ credentials secret automatically when true and ARN is not provided."
   type        = bool
   default     = true
-
-  validation {
-    condition     = var.enable_lambda_worker ? (var.lambda_rabbitmq_credentials_secret_arn != null || var.create_lambda_rabbitmq_credentials_secret) : true
-    error_message = "When enable_lambda_worker is true, set lambda_rabbitmq_credentials_secret_arn or create_lambda_rabbitmq_credentials_secret=true."
-  }
 }
 
 variable "lambda_rabbitmq_username" {
@@ -256,11 +232,6 @@ variable "rabbitmq_admin_credentials_secret_arn" {
   description = "Secrets Manager ARN containing RabbitMQ admin credentials JSON (username/password) for rotation lambda."
   type        = string
   default     = null
-
-  validation {
-    condition     = var.enable_rabbitmq_credentials_rotation ? (var.rabbitmq_admin_credentials_secret_arn != null || var.create_rabbitmq_admin_credentials_secret) : true
-    error_message = "When credentials rotation is enabled, provide rabbitmq_admin_credentials_secret_arn or set create_rabbitmq_admin_credentials_secret=true."
-  }
 }
 
 variable "create_rabbitmq_admin_credentials_secret" {
@@ -308,11 +279,6 @@ variable "lambda_rabbitmq_queue_name" {
   description = "RabbitMQ queue name to monitor."
   type        = string
   default     = null
-
-  validation {
-    condition     = var.enable_lambda_worker ? var.lambda_rabbitmq_queue_name != null : true
-    error_message = "lambda_rabbitmq_queue_name is required when enable_lambda_worker is true."
-  }
 }
 
 variable "lambda_rabbitmq_api_timeout_sec" {
