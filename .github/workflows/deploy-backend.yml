@@ -51,10 +51,7 @@ jobs:
           if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
             echo "Existing bucket detected: $BUCKET"
             terraform -chdir=global/backend import aws_s3_bucket.state "$BUCKET" || true
-            terraform -chdir=global/backend import aws_s3_bucket_versioning.state "$BUCKET" || true
-            terraform -chdir=global/backend import aws_s3_bucket_server_side_encryption_configuration.state "$BUCKET" || true
-            terraform -chdir=global/backend import aws_s3_bucket_public_access_block.state "$BUCKET" || true
-            terraform -chdir=global/backend import aws_s3_bucket_ownership_controls.state "$BUCKET" || true
+            # Optional nested resources may not exist yet; let terraform apply create/manage them.
           else
             echo "No existing bucket found. Terraform will create it."
           fi
