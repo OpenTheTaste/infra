@@ -395,6 +395,69 @@ jobs:
             --query "length(Buckets[?contains(Name, '$PROJECT-$ENV_NAME-media')])" --output text)
           check_count "S3 Media Buckets" "$s3_count"
 
+          # EBS volumes (unattached cost risk)
+          ebs_count=$(aws ec2 describe-volumes --region "$REGION" \
+            --filters Name=tag:Project,Values="$PROJECT" Name=tag:Env,Values="$ENV_NAME" \
+            --query 'length(Volumes[])' --output text)
+          check_count "EBS Volumes" "$ebs_count"
+
+          # EBS snapshots (storage cost risk)
+          snap_count=$(aws ec2 describe-snapshots --region "$REGION" --owner-ids self \
+            --filters Name=tag:Project,Values="$PROJECT" Name=tag:Env,Values="$ENV_NAME" \
+            --query 'length(Snapshots[])' --output text)
+          check_count "EBS Snapshots" "$snap_count"
+
+          # ENI (detached ENI can block subnet/vpc delete and sometimes cost indirectly)
+          eni_count=$(aws ec2 describe-network-interfaces --region "$REGION" \
+            --filters Name=tag:Project,Values="$PROJECT" Name=tag:Env,Values="$ENV_NAME" \
+            --query 'length(NetworkInterfaces[])' --output text)
+          check_count "Network Interfaces" "$eni_count"
+
+          # Lambda functions
+          lambda_count=$(aws lambda list-functions --region "$REGION" \
+            --query "length(Functions[?contains(FunctionName, '$PROJECT-$ENV_NAME')])" --output text)
+          check_count "Lambda Functions" "$lambda_count"
+
+          # Lambda log groups
+          lambda_log_count=$(aws logs describe-log-groups --region "$REGION" \
+            --log-group-name-prefix "/aws/lambda/${PROJECT}-${ENV_NAME}" \
+            --query 'length(logGroups)' --output text)
+          check_count "Lambda Log Groups" "$lambda_log_count"
+
+          # ECS/Container log groups
+          ecs_log_count=$(aws logs describe-log-groups --region "$REGION" \
+            --log-group-name-prefix "/ecs/${PROJECT}-${ENV_NAME}" \
+            --query 'length(logGroups)' --output text)
+          check_count "ECS Log Groups" "$ecs_log_count"
+
+          # Security groups
+          sg_count=$(aws ec2 describe-security-groups --region "$REGION" \
+            --filters Name=tag:Project,Values="$PROJECT" Name=tag:Env,Values="$ENV_NAME" \
+            --query 'length(SecurityGroups[])' --output text)
+          check_count "Security Groups" "$sg_count"
+
+          # VPCs
+          vpc_count=$(aws ec2 describe-vpcs --region "$REGION" \
+            --filters Name=tag:Project,Values="$PROJECT" Name=tag:Env,Values="$ENV_NAME" \
+            --query 'length(Vpcs[])' --output text)
+          check_count "VPCs" "$vpc_count"
+
+          # Secrets Manager
+          secrets_count=$(aws secretsmanager list-secrets --region "$REGION" \
+            --query "length(SecretList[?contains(Name, '$PROJECT/$ENV_NAME/')])" --output text)
+          check_count "Secrets" "$secrets_count"
+
+          # SSM Parameters
+          ssm_count=$(aws ssm describe-parameters --region "$REGION" \
+            --parameter-filters "Key=Name,Option=BeginsWith,Values=/$PROJECT/$ENV_NAME/" \
+            --query 'length(Parameters[])' --output text)
+          check_count "SSM Parameters" "$ssm_count"
+
+          # ECR repositories
+          ecr_count=$(aws ecr describe-repositories --region "$REGION" \
+            --query "length(repositories[?contains(repositoryName, '$PROJECT-$ENV_NAME')])" --output text 2>/dev/null || echo 0)
+          check_count "ECR Repositories" "$ecr_count"
+
           echo "----------------------------------------"
           if [ "$failures" -gt 0 ]; then
             echo "[FAIL] leftover billable resources detected: ${failures} category(ies)."
