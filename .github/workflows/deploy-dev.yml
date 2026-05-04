@@ -86,9 +86,12 @@ jobs:
 
           PROJECT="${{ github.event.inputs.project || 'oplust' }}"
           ENV_NAME="${{ github.event.inputs.environment || 'dev' }}"
+          BASE_DOMAIN="${{ github.event.inputs.base_domain || 'openthetaste.cloud' }}"
+          AWS_REGION="${{ github.event.inputs.aws_region || 'ap-northeast-2' }}"
           NAME_PREFIX="${PROJECT}-${ENV_NAME}"
           OAC_NAME="${NAME_PREFIX}-media-oac"
           ECS_LOG_GROUP="/ecs/${NAME_PREFIX}-transcoder-task"
+          TF_VAR_ARGS="-var=project=${PROJECT} -var=environment=${ENV_NAME} -var=base_domain=${BASE_DOMAIN} -var=aws_region=${AWS_REGION}"
 
           # CloudFront OAC import by name (global service)
           oac_id=$(aws cloudfront list-origin-access-controls \
@@ -98,6 +101,7 @@ jobs:
             echo "Found existing OAC: ${OAC_NAME} (${oac_id})"
             set +e
             terraform -chdir=environments/dev import \
+              $TF_VAR_ARGS \
               'module.orchestrator.module.cloudfront[0].aws_cloudfront_origin_access_control.this[0]' \
               "$oac_id"
             import_ec=$?
@@ -119,6 +123,7 @@ jobs:
             echo "Found existing ECS log group: ${ECS_LOG_GROUP}"
             set +e
             terraform -chdir=environments/dev import \
+              $TF_VAR_ARGS \
               'module.orchestrator.module.ecs_transcoder[0].aws_cloudwatch_log_group.this' \
               "$ECS_LOG_GROUP"
             import_lg_ec=$?
