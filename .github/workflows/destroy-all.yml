@@ -144,6 +144,42 @@ jobs:
             echo "No backend bucket found to import."
           fi
 
+      - name: Empty backend bucket versions before destroy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGION="${{ github.event.inputs.aws_region || 'ap-northeast-2' }}"
+          BUCKET_INPUT="${{ github.event.inputs.state_bucket }}"
+          if [ -n "$BUCKET_INPUT" ]; then
+            BUCKET="$BUCKET_INPUT"
+          else
+            BUCKET="oplust-tfstate-${ACCOUNT_ID}-${REGION}"
+          fi
+
+          if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "Backend bucket does not exist. Skip emptying."
+            exit 0
+          fi
+
+          # Delete current objects
+          aws s3 rm "s3://$BUCKET" --recursive || true
+
+          # Delete all object versions
+          versions_json=$(aws s3api list-object-versions --bucket "$BUCKET" --output json --query '{Objects: Versions[].{Key:Key,VersionId:VersionId},Quiet:true}')
+          if [ "$(echo "$versions_json" | jq '.Objects | length')" -gt 0 ]; then
+            aws s3api delete-objects --bucket "$BUCKET" --delete "$versions_json" || true
+          fi
+
+          # Delete all delete markers
+          markers_json=$(aws s3api list-object-versions --bucket "$BUCKET" --output json --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId},Quiet:true}')
+          if [ "$(echo "$markers_json" | jq '.Objects | length')" -gt 0 ]; then
+            aws s3api delete-objects --bucket "$BUCKET" --delete "$markers_json" || true
+          fi
+
+          echo "Backend bucket objects/versions cleanup done."
+
       - name: Terraform Destroy Plan (global/backend)
         run: terraform -chdir=global/backend plan -destroy -var="force_destroy_bucket=true" -out destroy.tfplan
 
