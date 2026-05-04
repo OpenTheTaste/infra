@@ -193,7 +193,7 @@ jobs:
   force-cleanup:
     runs-on: ubuntu-latest
     needs: destroy-dev
-    if: ${{ github.event.inputs.confirm == 'DESTROY' && needs.destroy-dev.result == 'success' && github.event.inputs.force_cleanup == 'true' }}
+    if: ${{ always() && github.event.inputs.confirm == 'DESTROY' && github.event.inputs.force_cleanup == 'true' && needs.destroy-dev.result != 'cancelled' }}
 
     steps:
       - name: Configure AWS credentials (OIDC)
@@ -247,6 +247,7 @@ jobs:
           # RDS
           dbs=$(aws rds describe-db-instances --region "$REGION" --query "DBInstances[?contains(DBInstanceIdentifier, '$PREFIX')].DBInstanceIdentifier" --output text || true)
           for db in $dbs; do
+            aws rds modify-db-instance --region "$REGION" --db-instance-identifier "$db" --no-deletion-protection --apply-immediately >/dev/null 2>&1 || true
             aws rds delete-db-instance --region "$REGION" --db-instance-identifier "$db" --skip-final-snapshot --delete-automated-backups >/dev/null 2>&1 || true
           done
           subnets=$(aws rds describe-db-subnet-groups --region "$REGION" --query "DBSubnetGroups[?contains(DBSubnetGroupName, '$PREFIX')].DBSubnetGroupName" --output text || true)
@@ -307,11 +308,45 @@ jobs:
             aws s3 rb "s3://$b" --force >/dev/null 2>&1 || true
           done
 
+          # CloudFront distributions by comment prefix: disable then delete
+          dist_ids=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?Comment=='${PREFIX}'].Id" --output text 2>/dev/null || true)
+          for did in $dist_ids; do
+            [ -z "${did:-}" ] && continue
+            cfg_file=$(mktemp)
+            etag=$(aws cloudfront get-distribution-config --id "$did" --query 'ETag' --output text 2>/dev/null || true)
+            aws cloudfront get-distribution-config --id "$did" --query 'DistributionConfig' --output json > "$cfg_file" 2>/dev/null || true
+            if [ -s "$cfg_file" ] && [ -n "${etag:-}" ] && [ "$etag" != "None" ] && [ "$etag" != "null" ]; then
+              jq '.Enabled=false' "$cfg_file" > "${cfg_file}.disabled" && mv "${cfg_file}.disabled" "$cfg_file"
+              aws cloudfront update-distribution --id "$did" --if-match "$etag" --distribution-config file://"$cfg_file" >/dev/null 2>&1 || true
+              # Wait until deployed before delete
+              for _ in {1..40}; do
+                status=$(aws cloudfront get-distribution --id "$did" --query 'Distribution.Status' --output text 2>/dev/null || echo "Unknown")
+                [ "$status" = "Deployed" ] && break
+                sleep 15
+              done
+              del_etag=$(aws cloudfront get-distribution-config --id "$did" --query 'ETag' --output text 2>/dev/null || true)
+              aws cloudfront delete-distribution --id "$did" --if-match "$del_etag" >/dev/null 2>&1 || true
+            fi
+            rm -f "$cfg_file" "${cfg_file}.disabled" >/dev/null 2>&1 || true
+          done
+
           # CloudFront Origin Access Controls by name prefix
           oac_ids=$(aws cloudfront list-origin-access-controls \
             --query "OriginAccessControlList.Items[?contains(Name, '${PREFIX}')].Id" --output text 2>/dev/null || true)
           for oid in $oac_ids; do
             aws cloudfront delete-origin-access-control --id "$oid" --if-match "$(aws cloudfront get-origin-access-control --id "$oid" --query 'ETag' --output text 2>/dev/null || true)" >/dev/null 2>&1 || true
+          done
+
+          # ACM certificates for base/admin/media domains
+          base_domain="${{ github.event.inputs.base_domain || 'openthetaste.cloud' }}"
+          admin_domain="admin.${base_domain}"
+          media_domain="cdn.${base_domain}"
+          cert_arns=$(aws acm list-certificates --region "$REGION" \
+            --query "CertificateSummaryList[?DomainName=='${base_domain}' || DomainName=='${admin_domain}' || DomainName=='${media_domain}'].CertificateArn" \
+            --output text 2>/dev/null || true)
+          for c in $cert_arns; do
+            aws acm delete-certificate --region "$REGION" --certificate-arn "$c" >/dev/null 2>&1 || true
           done
 
           # CloudWatch log groups
@@ -422,6 +457,11 @@ jobs:
             oac_count=0
           fi
           check_count "CloudFront OAC" "$oac_count"
+
+          acm_count=$(aws acm list-certificates --region "$REGION" \
+            --query "length(CertificateSummaryList[?contains(DomainName, '$PROJECT') || contains(DomainName, '${{ github.event.inputs.base_domain || 'openthetaste.cloud' }}')])" \
+            --output text 2>/dev/null || echo 0)
+          check_count "ACM Certificates" "$acm_count"
 
           s3_count=$(aws s3api list-buckets \
             --query "length(Buckets[?contains(Name, '$PROJECT-$ENV_NAME-media')])" --output text)
