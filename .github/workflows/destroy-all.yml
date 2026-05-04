@@ -344,7 +344,45 @@ jobs:
           oac_ids=$(aws cloudfront list-origin-access-controls \
             --query "OriginAccessControlList.Items[?contains(Name, '${PREFIX}')].Id" --output text 2>/dev/null || true)
           for oid in $oac_ids; do
-            aws cloudfront delete-origin-access-control --id "$oid" --if-match "$(aws cloudfront get-origin-access-control --id "$oid" --query 'ETag' --output text 2>/dev/null || true)" >/dev/null 2>&1 || true
+            [ -z "${oid:-}" ] && continue
+
+            # Find distributions using this OAC and delete them first.
+            using_dist_ids=$(aws cloudfront list-distributions --output json 2>/dev/null | jq -r --arg OID "$oid" '
+              (.DistributionList.Items // [])
+              | map(select(any(.Origins.Items[]?; .OriginAccessControlId? == $OID)))
+              | .[].Id
+            ' || true)
+
+            for did in $using_dist_ids; do
+              [ -z "${did:-}" ] && continue
+              cfg_file=$(mktemp)
+              etag=$(aws cloudfront get-distribution-config --id "$did" --query 'ETag' --output text 2>/dev/null || true)
+              aws cloudfront get-distribution-config --id "$did" --query 'DistributionConfig' --output json > "$cfg_file" 2>/dev/null || true
+              if [ -s "$cfg_file" ] && [ -n "${etag:-}" ] && [ "$etag" != "None" ] && [ "$etag" != "null" ]; then
+                jq '.Enabled=false' "$cfg_file" > "${cfg_file}.disabled" && mv "${cfg_file}.disabled" "$cfg_file"
+                aws cloudfront update-distribution --id "$did" --if-match "$etag" --distribution-config file://"$cfg_file" >/dev/null 2>&1 || true
+                for _ in {1..40}; do
+                  status=$(aws cloudfront get-distribution --id "$did" --query 'Distribution.Status' --output text 2>/dev/null || echo "Unknown")
+                  [ "$status" = "Deployed" ] && break
+                  sleep 15
+                done
+                del_etag=$(aws cloudfront get-distribution-config --id "$did" --query 'ETag' --output text 2>/dev/null || true)
+                aws cloudfront delete-distribution --id "$did" --if-match "$del_etag" >/dev/null 2>&1 || true
+              fi
+              rm -f "$cfg_file" "${cfg_file}.disabled" >/dev/null 2>&1 || true
+            done
+
+            # Retry OAC delete after dependent distributions cleanup.
+            for _ in {1..10}; do
+              oac_etag=$(aws cloudfront get-origin-access-control --id "$oid" --query 'ETag' --output text 2>/dev/null || true)
+              if [ -z "${oac_etag:-}" ] || [ "$oac_etag" = "None" ] || [ "$oac_etag" = "null" ]; then
+                break
+              fi
+              if aws cloudfront delete-origin-access-control --id "$oid" --if-match "$oac_etag" >/dev/null 2>&1; then
+                break
+              fi
+              sleep 15
+            done
           done
 
           # ACM certificates for base/admin/media domains
