@@ -166,17 +166,24 @@ jobs:
           # Delete current objects
           aws s3 rm "s3://$BUCKET" --recursive || true
 
-          # Delete all object versions
-          versions_json=$(aws s3api list-object-versions --bucket "$BUCKET" --output json --query '{Objects: Versions[].{Key:Key,VersionId:VersionId},Quiet:true}')
-          if [ "$(echo "$versions_json" | jq '.Objects | length')" -gt 0 ]; then
-            aws s3api delete-objects --bucket "$BUCKET" --delete "$versions_json" || true
-          fi
+          # Delete all versions/delete-markers with pagination until empty
+          while true; do
+            page=$(aws s3api list-object-versions --bucket "$BUCKET" --max-items 1000 --output json)
+            payload=$(echo "$page" | jq '{Objects: ((.Versions // []) + (.DeleteMarkers // []) | map({Key:.Key,VersionId:.VersionId})), Quiet:true}')
+            count=$(echo "$payload" | jq '.Objects | length')
+            if [ "$count" -eq 0 ]; then
+              break
+            fi
+            aws s3api delete-objects --bucket "$BUCKET" --delete "$payload" || true
+          done
 
-          # Delete all delete markers
-          markers_json=$(aws s3api list-object-versions --bucket "$BUCKET" --output json --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId},Quiet:true}')
-          if [ "$(echo "$markers_json" | jq '.Objects | length')" -gt 0 ]; then
-            aws s3api delete-objects --bucket "$BUCKET" --delete "$markers_json" || true
-          fi
+          # Abort any in-progress multipart uploads
+          uploads=$(aws s3api list-multipart-uploads --bucket "$BUCKET" --query 'Uploads[].{Key:Key,UploadId:UploadId}' --output json 2>/dev/null || echo "[]")
+          echo "$uploads" | jq -c '.[]?' | while read -r u; do
+            key=$(echo "$u" | jq -r '.Key')
+            upload_id=$(echo "$u" | jq -r '.UploadId')
+            aws s3api abort-multipart-upload --bucket "$BUCKET" --key "$key" --upload-id "$upload_id" || true
+          done
 
           echo "Backend bucket objects/versions cleanup done."
 
