@@ -307,6 +307,21 @@ jobs:
             aws s3 rb "s3://$b" --force >/dev/null 2>&1 || true
           done
 
+          # CloudWatch log groups
+          ecs_lg_names=$(aws logs describe-log-groups --region "$REGION" \
+            --log-group-name-prefix "/ecs/${PROJECT}-${ENV_NAME}" \
+            --query 'logGroups[].logGroupName' --output text || true)
+          for lg in $ecs_lg_names; do
+            aws logs delete-log-group --region "$REGION" --log-group-name "$lg" >/dev/null 2>&1 || true
+          done
+
+          lambda_lg_names=$(aws logs describe-log-groups --region "$REGION" \
+            --log-group-name-prefix "/aws/lambda/${PROJECT}-${ENV_NAME}" \
+            --query 'logGroups[].logGroupName' --output text || true)
+          for lg in $lambda_lg_names; do
+            aws logs delete-log-group --region "$REGION" --log-group-name "$lg" >/dev/null 2>&1 || true
+          done
+
           echo "[force-cleanup] completed."
 
   verify-no-leftovers:
