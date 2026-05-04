@@ -101,7 +101,7 @@ jobs:
   destroy-backend:
     runs-on: ubuntu-latest
     needs: destroy-dev
-    if: ${{ github.event.inputs.confirm == 'DESTROY' && github.event.inputs.destroy_backend == 'true' }}
+    if: ${{ always() && github.event.inputs.confirm == 'DESTROY' && github.event.inputs.destroy_backend == 'true' && needs.destroy-dev.result != 'cancelled' }}
 
     steps:
       - name: Checkout
@@ -372,7 +372,7 @@ jobs:
       - destroy-dev
       - destroy-backend
       - force-cleanup
-    if: ${{ always() && github.event.inputs.confirm == 'DESTROY' && (needs.destroy-dev.result == 'success') && (github.event.inputs.destroy_backend != 'true' || needs.destroy-backend.result == 'success') }}
+    if: ${{ always() && github.event.inputs.confirm == 'DESTROY' && needs.force-cleanup.result == 'success' && (github.event.inputs.destroy_backend != 'true' || needs.destroy-backend.result == 'success') }}
 
     steps:
       - name: Configure AWS credentials (OIDC)
