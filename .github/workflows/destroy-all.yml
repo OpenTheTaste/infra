@@ -96,7 +96,16 @@ jobs:
         run: terraform -chdir=environments/dev plan -destroy -var="aws_region=${{ github.event.inputs.aws_region || 'ap-northeast-2' }}" -var="project=${{ github.event.inputs.project || 'oplust' }}" -var="environment=${{ github.event.inputs.environment || 'dev' }}" -var="base_domain=${{ github.event.inputs.base_domain || 'openthetaste.cloud' }}" -out destroy.tfplan
 
       - name: Terraform Destroy Apply (dev)
-        run: terraform -chdir=environments/dev apply -auto-approve destroy.tfplan
+        shell: bash
+        run: |
+          set +e
+          terraform -chdir=environments/dev apply -auto-approve destroy.tfplan
+          ec=$?
+          set -e
+          if [ "$ec" -ne 0 ]; then
+            echo "[warn] terraform destroy apply failed in destroy-dev (exit=$ec)."
+            echo "[warn] continue to force-cleanup for residual resources."
+          fi
 
   destroy-backend:
     runs-on: ubuntu-latest
