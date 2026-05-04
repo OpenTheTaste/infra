@@ -208,8 +208,8 @@ module "rabbitmq_rotation_lambda_iam" {
   allow_secrets_manager_read     = true
   allow_secrets_manager_rotation = true
   allow_ecs_service_scale        = false
-  secret_arns                    = [local.rabbitmq_admin_secret_arn, local.lambda_secret_arn]
-  secret_rotation_arns           = [local.lambda_secret_arn]
+  secret_arns                    = compact([local.rabbitmq_admin_secret_arn, local.lambda_secret_arn])
+  secret_rotation_arns           = compact([local.lambda_secret_arn])
 
   managed_policy_arns = [
     "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",

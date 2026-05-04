@@ -75,7 +75,8 @@ locals {
   # Keep count conditions plan-time deterministic (avoid depending on resources created in same apply).
   rabbitmq_rotation_enabled = (
     var.enable_rabbitmq_credentials_rotation &&
-    (var.lambda_rabbitmq_credentials_secret_arn != null || var.create_lambda_rabbitmq_credentials_secret) &&
+    var.enable_lambda_worker &&
+    (var.lambda_rabbitmq_credentials_secret_arn != null || (var.create_lambda_rabbitmq_credentials_secret && var.enable_lambda_worker)) &&
     (var.rabbitmq_admin_credentials_secret_arn != null || var.create_rabbitmq_admin_credentials_secret)
   )
 }
