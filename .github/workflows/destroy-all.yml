@@ -307,6 +307,13 @@ jobs:
             aws s3 rb "s3://$b" --force >/dev/null 2>&1 || true
           done
 
+          # CloudFront Origin Access Controls by name prefix
+          oac_ids=$(aws cloudfront list-origin-access-controls \
+            --query "OriginAccessControlList.Items[?contains(Name, '${PREFIX}')].Id" --output text 2>/dev/null || true)
+          for oid in $oac_ids; do
+            aws cloudfront delete-origin-access-control --id "$oid" --if-match "$(aws cloudfront get-origin-access-control --id "$oid" --query 'ETag' --output text 2>/dev/null || true)" >/dev/null 2>&1 || true
+          done
+
           # CloudWatch log groups
           ecs_lg_names=$(aws logs describe-log-groups --region "$REGION" \
             --log-group-name-prefix "/ecs/${PROJECT}-${ENV_NAME}" \
@@ -405,6 +412,16 @@ jobs:
             cf_count=0
           fi
           check_count "CloudFront Distributions" "$cf_count"
+
+          set +e
+          oac_count=$(aws cloudfront list-origin-access-controls \
+            --query "length(OriginAccessControlList.Items[?contains(Name, '$PROJECT-$ENV_NAME')])" --output text 2>/dev/null)
+          oac_status=$?
+          set -e
+          if [ $oac_status -ne 0 ] || [ -z "$oac_count" ] || [ "$oac_count" = "None" ] || [ "$oac_count" = "null" ]; then
+            oac_count=0
+          fi
+          check_count "CloudFront OAC" "$oac_count"
 
           s3_count=$(aws s3api list-buckets \
             --query "length(Buckets[?contains(Name, '$PROJECT-$ENV_NAME-media')])" --output text)

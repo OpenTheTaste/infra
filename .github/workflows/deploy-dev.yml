@@ -79,6 +79,37 @@ jobs:
       - name: Terraform Init (dev)
         run: terraform -chdir=environments/dev init -backend-config=backend.hcl -reconfigure
 
+      - name: Import existing conflict-prone resources (best effort)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PROJECT="${{ github.event.inputs.project || 'oplust' }}"
+          ENV_NAME="${{ github.event.inputs.environment || 'dev' }}"
+          NAME_PREFIX="${PROJECT}-${ENV_NAME}"
+          OAC_NAME="${NAME_PREFIX}-media-oac"
+          ECS_LOG_GROUP="/ecs/${NAME_PREFIX}-transcoder-task"
+
+          # CloudFront OAC import by name (global service)
+          oac_id=$(aws cloudfront list-origin-access-controls \
+            --query "OriginAccessControlList.Items[?Name=='${OAC_NAME}'].Id | [0]" \
+            --output text 2>/dev/null || true)
+          if [ -n "${oac_id:-}" ] && [ "$oac_id" != "None" ] && [ "$oac_id" != "null" ]; then
+            terraform -chdir=environments/dev import \
+              'module.orchestrator.module.cloudfront[0].aws_cloudfront_origin_access_control.this[0]' \
+              "$oac_id" || true
+          fi
+
+          # ECS log group import by exact name
+          if aws logs describe-log-groups \
+            --log-group-name-prefix "$ECS_LOG_GROUP" \
+            --query "length(logGroups[?logGroupName=='${ECS_LOG_GROUP}'])" \
+            --output text | grep -q '^1$'; then
+            terraform -chdir=environments/dev import \
+              'module.orchestrator.module.ecs_transcoder[0].aws_cloudwatch_log_group.this' \
+              "$ECS_LOG_GROUP" || true
+          fi
+
       - name: Terraform Validate (dev)
         run: terraform -chdir=environments/dev validate
 
