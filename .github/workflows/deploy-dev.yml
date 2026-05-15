@@ -158,6 +158,38 @@ jobs:
             fi
           fi
 
+          # Secrets Manager imports (when secret already exists but not in state)
+          import_secret_if_exists() {
+            local secret_id="$1"
+            local tf_addr="$2"
+            if aws secretsmanager describe-secret --secret-id "$secret_id" >/dev/null 2>&1; then
+              echo "Found existing secret: $secret_id"
+              if terraform -chdir=environments/dev state show "$tf_addr" >/dev/null 2>&1; then
+                echo "Secret resource already in terraform state. Skip import: $tf_addr"
+              else
+                set +e
+                terraform -chdir=environments/dev import \
+                  $TF_VAR_ARGS \
+                  "$tf_addr" \
+                  "$secret_id"
+                import_secret_ec=$?
+                set -e
+                if [ "$import_secret_ec" -ne 0 ]; then
+                  echo "[warn] secret import failed: $secret_id -> $tf_addr"
+                fi
+              fi
+            fi
+          }
+
+          import_secret_if_exists "oplust/dev/rabbitmq/admin-credentials" \
+            "module.orchestrator.aws_secretsmanager_secret.rabbitmq_admin_credentials[0]"
+
+          import_secret_if_exists "oplust/dev/rabbitmq/credentials" \
+            "module.orchestrator.aws_secretsmanager_secret.lambda_rabbitmq_credentials[0]"
+
+          import_secret_if_exists "oplust/dev/monitoring/grafana-admin-credentials" \
+            "module.orchestrator.aws_secretsmanager_secret.monitoring_grafana_admin_credentials[0]"
+
       - name: Terraform Validate (dev)
         run: terraform -chdir=environments/dev validate
 
