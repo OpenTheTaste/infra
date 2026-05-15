@@ -365,15 +365,15 @@ variable "monitoring_grafana_admin_secret_name" {
 
 variable "api_user_env_parameter_value" {
   type    = string
-  default = ""
+  default = "SPRING_PROFILES_ACTIVE=dev"
 }
 
 variable "api_admin_env_parameter_value" {
   type    = string
-  default = ""
+  default = "SPRING_PROFILES_ACTIVE=dev"
 }
 
 variable "machine_env_parameter_value" {
   type    = string
-  default = ""
+  default = "SPRING_PROFILES_ACTIVE=dev"
 }

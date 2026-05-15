@@ -449,17 +449,17 @@ variable "monitoring_grafana_admin_secret_name" {
 variable "api_user_env_parameter_value" {
   description = "SSM parameter value for /<project>/<env>/api-user/env."
   type        = string
-  default     = ""
+  default     = "SPRING_PROFILES_ACTIVE=dev"
 }
 
 variable "api_admin_env_parameter_value" {
   description = "SSM parameter value for /<project>/<env>/api-admin/env."
   type        = string
-  default     = ""
+  default     = "SPRING_PROFILES_ACTIVE=dev"
 }
 
 variable "machine_env_parameter_value" {
   description = "SSM parameter value for /<project>/<env>/machine/env."
   type        = string
-  default     = ""
+  default     = "SPRING_PROFILES_ACTIVE=dev"
 }
