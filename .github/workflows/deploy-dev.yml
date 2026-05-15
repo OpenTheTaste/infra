@@ -210,6 +210,10 @@ jobs:
             -var="project=${{ github.event.inputs.project || 'oplust' }}" \
             -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
             -var="base_domain=${{ github.event.inputs.base_domain || 'openthetaste.cloud' }}" \
+            -var="enable_ecs_transcoder=true" \
+            -var="enable_lambda_worker=true" \
+            -var="lambda_ecs_cluster_name=${{ github.event.inputs.project || 'oplust' }}-${{ github.event.inputs.environment || 'dev' }}-transcoder-cluster" \
+            -var="lambda_ecs_service_name=${{ github.event.inputs.project || 'oplust' }}-${{ github.event.inputs.environment || 'dev' }}-transcoder" \
             -out tfplan
           ec=$?
           set -e
