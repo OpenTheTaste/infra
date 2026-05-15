@@ -164,6 +164,12 @@ jobs:
             local tf_addr="$2"
             if aws secretsmanager describe-secret --secret-id "$secret_id" >/dev/null 2>&1; then
               echo "Found existing secret: $secret_id"
+              local secret_arn
+              secret_arn=$(aws secretsmanager describe-secret --secret-id "$secret_id" --query 'ARN' --output text 2>/dev/null || true)
+              if [ -z "${secret_arn:-}" ] || [ "$secret_arn" = "None" ] || [ "$secret_arn" = "null" ]; then
+                echo "[warn] cannot resolve ARN for secret: $secret_id"
+                return 0
+              fi
               if terraform -chdir=environments/dev state show "$tf_addr" >/dev/null 2>&1; then
                 echo "Secret resource already in terraform state. Skip import: $tf_addr"
               else
@@ -171,11 +177,13 @@ jobs:
                 terraform -chdir=environments/dev import \
                   $TF_VAR_ARGS \
                   "$tf_addr" \
-                  "$secret_id"
+                  "$secret_arn"
                 import_secret_ec=$?
                 set -e
                 if [ "$import_secret_ec" -ne 0 ]; then
-                  echo "[warn] secret import failed: $secret_id -> $tf_addr"
+                  echo "[warn] secret import failed: $secret_id ($secret_arn) -> $tf_addr"
+                  echo "[warn] fallback: force-delete existing secret so terraform can recreate it."
+                  aws secretsmanager delete-secret --secret-id "$secret_id" --force-delete-without-recovery >/dev/null 2>&1 || true
                 fi
               fi
             fi
