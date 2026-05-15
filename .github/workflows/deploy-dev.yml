@@ -53,6 +53,22 @@ jobs:
           role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
           aws-region: ${{ github.event.inputs.aws_region || 'ap-northeast-2' }}
 
+      - name: Restore scheduled-deletion secrets (best effort)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          secrets=(
+            "oplust/dev/rabbitmq/admin-credentials"
+            "oplust/dev/rabbitmq/credentials"
+            "oplust/dev/monitoring/grafana-admin-credentials"
+          )
+
+          for s in "${secrets[@]}"; do
+            echo "Try restore secret: $s"
+            aws secretsmanager restore-secret --secret-id "$s" >/dev/null 2>&1 || true
+          done
+
       - name: Generate backend.hcl for dev
         shell: bash
         run: |
