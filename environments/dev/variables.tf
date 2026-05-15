@@ -226,7 +226,7 @@ variable "lambda_rabbitmq_vhost" {
 
 variable "lambda_rabbitmq_queue_name" {
   type    = string
-  default = null
+  default = "transcode.queue"
 }
 
 variable "lambda_rabbitmq_api_timeout_sec" {
