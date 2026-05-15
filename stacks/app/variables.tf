@@ -445,3 +445,21 @@ variable "monitoring_grafana_admin_secret_name" {
   type        = string
   default     = null
 }
+
+variable "api_user_env_parameter_value" {
+  description = "SSM parameter value for /<project>/<env>/api-user/env."
+  type        = string
+  default     = ""
+}
+
+variable "api_admin_env_parameter_value" {
+  description = "SSM parameter value for /<project>/<env>/api-admin/env."
+  type        = string
+  default     = ""
+}
+
+variable "machine_env_parameter_value" {
+  description = "SSM parameter value for /<project>/<env>/machine/env."
+  type        = string
+  default     = ""
+}

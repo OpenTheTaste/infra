@@ -80,4 +80,7 @@ module "orchestrator" {
   monitoring_grafana_admin_password_length  = var.monitoring_grafana_admin_password_length
   monitoring_grafana_admin_secret_name      = var.monitoring_grafana_admin_secret_name
   monitoring_prometheus_scrape_targets      = var.monitoring_prometheus_scrape_targets
+  api_user_env_parameter_value              = var.api_user_env_parameter_value
+  api_admin_env_parameter_value             = var.api_admin_env_parameter_value
+  machine_env_parameter_value               = var.machine_env_parameter_value
 }

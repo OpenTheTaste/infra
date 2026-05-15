@@ -125,10 +125,10 @@ module "app_ec2_iam" {
     "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
   ]
 
-  allow_ssm_parameter_read   = false
+  allow_ssm_parameter_read   = true
   allow_secrets_manager_read = false
   secret_arns                = []
-  ssm_parameter_arns         = []
+  ssm_parameter_arns         = values(module.app_service_env_parameters.parameter_arns)
 
   tags = local.common_tags
 }
@@ -164,6 +164,19 @@ module "monitoring_ec2_iam" {
   allow_secrets_manager_read = length(local.monitoring_secret_arns) > 0
   secret_arns                = local.monitoring_secret_arns
   ssm_parameter_arns         = []
+
+  tags = local.common_tags
+}
+
+module "app_service_env_parameters" {
+  source = "../../modules/parameter_store"
+
+  name_prefix = local.service_env_parameter_prefix
+  parameters = {
+    "api-user/env"  = var.api_user_env_parameter_value
+    "api-admin/env" = var.api_admin_env_parameter_value
+    "machine/env"   = var.machine_env_parameter_value
+  }
 
   tags = local.common_tags
 }

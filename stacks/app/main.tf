@@ -26,6 +26,7 @@ locals {
   transcoder_cluster_name          = coalesce(var.lambda_ecs_cluster_name, try(module.ecs_transcoder[0].cluster_name, null))
   transcoder_service_name          = coalesce(var.lambda_ecs_service_name, try(module.ecs_transcoder[0].service_name, null))
   lambda_parameter_prefix          = "/${var.project}/${var.environment}/lambda/worker"
+  service_env_parameter_prefix     = "/${var.project}/${var.environment}"
   cloudfront_auth_parameter_prefix = "/${var.project}/${var.environment}/cloudfront/auth"
   lambda_ecs_service_arn           = var.enable_lambda_worker && local.transcoder_cluster_name != null && local.transcoder_service_name != null ? "arn:aws:ecs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:service/${local.transcoder_cluster_name}/${local.transcoder_service_name}" : null
   rabbitmq_api_base_url            = coalesce(var.lambda_rabbitmq_api_base_url, "http://${module.rabbitmq.private_ip}:15672")

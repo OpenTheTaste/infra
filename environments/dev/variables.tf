@@ -362,3 +362,18 @@ variable "monitoring_grafana_admin_secret_name" {
   type    = string
   default = null
 }
+
+variable "api_user_env_parameter_value" {
+  type    = string
+  default = ""
+}
+
+variable "api_admin_env_parameter_value" {
+  type    = string
+  default = ""
+}
+
+variable "machine_env_parameter_value" {
+  type    = string
+  default = ""
+}
