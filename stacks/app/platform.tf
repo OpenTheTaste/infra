@@ -119,15 +119,16 @@ module "app_ec2_iam" {
   source = "../../modules/iam"
 
   role_name = "${var.project}-${var.environment}-ec2-app"
-  create_inline_policy = false
+  create_inline_policy = true
 
   managed_policy_arns = [
-    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+    "arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess"
   ]
 
   allow_ssm_parameter_read   = true
-  allow_secrets_manager_read = false
-  secret_arns                = []
+  allow_secrets_manager_read = true
+  secret_arns                = ["*"]
   ssm_parameter_arns         = values(module.app_service_env_parameters.parameter_arns)
 
   tags = local.common_tags
