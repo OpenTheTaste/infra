@@ -12,10 +12,11 @@ module "admin_ec2" {
   user_data     = <<-EOT
     #!/bin/bash
     set -euxo pipefail
-    if systemctl list-unit-files | grep -q amazon-ssm-agent; then
-      systemctl enable amazon-ssm-agent || true
-      systemctl restart amazon-ssm-agent || systemctl start amazon-ssm-agent || true
+    if ! rpm -q amazon-ssm-agent >/dev/null 2>&1; then
+      dnf -y install amazon-ssm-agent || true
     fi
+    systemctl enable amazon-ssm-agent || true
+    systemctl restart amazon-ssm-agent || systemctl start amazon-ssm-agent || true
   EOT
 
   target_group_attachments = [
@@ -42,10 +43,11 @@ module "user_ec2" {
   user_data     = <<-EOT
     #!/bin/bash
     set -euxo pipefail
-    if systemctl list-unit-files | grep -q amazon-ssm-agent; then
-      systemctl enable amazon-ssm-agent || true
-      systemctl restart amazon-ssm-agent || systemctl start amazon-ssm-agent || true
+    if ! rpm -q amazon-ssm-agent >/dev/null 2>&1; then
+      dnf -y install amazon-ssm-agent || true
     fi
+    systemctl enable amazon-ssm-agent || true
+    systemctl restart amazon-ssm-agent || systemctl start amazon-ssm-agent || true
   EOT
 
   target_group_attachments = [
