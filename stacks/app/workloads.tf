@@ -111,6 +111,14 @@ module "monitoring" {
   ]
 }
 
+resource "aws_lb_target_group_attachment" "monitoring" {
+  count = var.enable_monitoring ? 1 : 0
+
+  target_group_arn = module.alb.target_group_arns["monitoring"]
+  target_id        = module.monitoring[0].instance_id
+  port             = 3000
+}
+
 module "lambda_worker" {
   count  = var.enable_lambda_worker ? 1 : 0
   source = "../../modules/lambda_worker"

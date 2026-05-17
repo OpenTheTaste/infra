@@ -207,6 +207,16 @@ resource "aws_security_group" "monitoring" {
   tags = merge(local.common_tags, { Name = "${var.name_prefix}-monitoring-sg" })
 }
 
+resource "aws_security_group_rule" "monitoring_grafana_from_alb" {
+  type                     = "ingress"
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.monitoring.id
+  source_security_group_id = aws_security_group.alb.id
+  description              = "Grafana access from ALB"
+}
+
 resource "aws_security_group_rule" "rds_from_lambda" {
   type                     = "ingress"
   from_port                = var.db_port

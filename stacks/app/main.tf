@@ -20,6 +20,7 @@ data "aws_caller_identity" "current" {}
 
 locals {
   admin_host                       = "${var.admin_subdomain}.${var.base_domain}"
+  monitoring_host                  = "${var.monitoring_subdomain}.${var.base_domain}"
   media_host                       = "${var.media_subdomain}.${var.base_domain}"
   media_bucket_name                = coalesce(var.media_bucket_name, "${var.project}-${var.environment}-media-${data.aws_caller_identity.current.account_id}")
   lambda_subnet_ids                = length(var.lambda_vpc_subnet_ids) > 0 ? var.lambda_vpc_subnet_ids : module.vpc.private_subnet_ids

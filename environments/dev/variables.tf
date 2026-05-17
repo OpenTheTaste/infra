@@ -94,6 +94,11 @@ variable "admin_subdomain" {
   default = "admin"
 }
 
+variable "monitoring_subdomain" {
+  type    = string
+  default = "monitoring"
+}
+
 variable "route53_create_hosted_zone" {
   type    = bool
   default = true

@@ -14,7 +14,7 @@ module "acm" {
   source = "../../modules/acm"
 
   domain_name               = var.base_domain
-  subject_alternative_names = [local.admin_host]
+  subject_alternative_names = concat([local.admin_host], var.enable_monitoring ? [local.monitoring_host] : [])
   zone_id                   = module.route53_zone.zone_id
 
   tags = local.common_tags
@@ -31,29 +31,50 @@ module "alb" {
   enable_https    = true
   certificate_arn = module.acm.certificate_arn
 
-  target_groups = {
-    admin = {
-      port     = 8081
-      protocol = "HTTP"
-      health_check = {
-        path = "/health"
+  target_groups = merge(
+    {
+      admin = {
+        port     = 8081
+        protocol = "HTTP"
+        health_check = {
+          path = "/health"
+        }
       }
-    }
-    user = {
-      port     = 8080
-      protocol = "HTTP"
-    }
-  }
+      user = {
+        port     = 8080
+        protocol = "HTTP"
+      }
+    },
+    var.enable_monitoring ? {
+      monitoring = {
+        port     = 3000
+        protocol = "HTTP"
+        health_check = {
+          path    = "/api/health"
+          matcher = "200-399"
+        }
+      }
+    } : {}
+  )
 
   default_target_group = "user"
 
-  listener_rules = [
-    {
-      priority         = 10
-      target_group_key = "admin"
-      host_headers     = [local.admin_host]
-    }
-  ]
+  listener_rules = concat(
+    [
+      {
+        priority         = 10
+        target_group_key = "admin"
+        host_headers     = [local.admin_host]
+      }
+    ],
+    var.enable_monitoring ? [
+      {
+        priority         = 20
+        target_group_key = "monitoring"
+        host_headers     = [local.monitoring_host]
+      }
+    ] : []
+  )
 
   tags = local.common_tags
 }
@@ -123,4 +144,18 @@ module "cloudfront_auth_parameters" {
   }
 
   tags = local.common_tags
+}
+
+resource "aws_route53_record" "monitoring_alias" {
+  count = var.enable_monitoring ? 1 : 0
+
+  zone_id = module.route53_zone.zone_id
+  name    = local.monitoring_host
+  type    = "A"
+
+  alias {
+    name                   = module.alb.alb_dns_name
+    zone_id                = module.alb.alb_zone_id
+    evaluate_target_health = true
+  }
 }

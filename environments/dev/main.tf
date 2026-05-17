@@ -25,6 +25,7 @@ module "orchestrator" {
   create_cloudfront_auth_parameters      = var.create_cloudfront_auth_parameters
   cloudfront_signed_cookie_public_key_id = var.cloudfront_signed_cookie_public_key_id
   admin_subdomain                        = var.admin_subdomain
+  monitoring_subdomain                   = var.monitoring_subdomain
   route53_create_hosted_zone             = var.route53_create_hosted_zone
   route53_existing_zone_id               = var.route53_existing_zone_id
 
