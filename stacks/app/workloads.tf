@@ -9,6 +9,14 @@ module "admin_ec2" {
   security_group_id         = module.security_groups.admin_sg_id
 
   instance_type = "t3.medium"
+  user_data     = <<-EOT
+    #!/bin/bash
+    set -euxo pipefail
+    if systemctl list-unit-files | grep -q amazon-ssm-agent; then
+      systemctl enable amazon-ssm-agent || true
+      systemctl restart amazon-ssm-agent || systemctl start amazon-ssm-agent || true
+    fi
+  EOT
 
   target_group_attachments = [
     {
@@ -31,6 +39,14 @@ module "user_ec2" {
   security_group_id         = module.security_groups.user_sg_id
 
   instance_type = "t3.medium"
+  user_data     = <<-EOT
+    #!/bin/bash
+    set -euxo pipefail
+    if systemctl list-unit-files | grep -q amazon-ssm-agent; then
+      systemctl enable amazon-ssm-agent || true
+      systemctl restart amazon-ssm-agent || systemctl start amazon-ssm-agent || true
+    fi
+  EOT
 
   target_group_attachments = [
     {
