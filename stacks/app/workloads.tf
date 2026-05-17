@@ -12,6 +12,9 @@ module "admin_ec2" {
   user_data     = <<-EOT
     #!/bin/bash
     set -euxo pipefail
+    dnf -y install docker
+    systemctl enable docker
+    systemctl restart docker || systemctl start docker
     if ! rpm -q amazon-ssm-agent >/dev/null 2>&1; then
       dnf -y install amazon-ssm-agent || true
     fi
@@ -43,6 +46,9 @@ module "user_ec2" {
   user_data     = <<-EOT
     #!/bin/bash
     set -euxo pipefail
+    dnf -y install docker
+    systemctl enable docker
+    systemctl restart docker || systemctl start docker
     if ! rpm -q amazon-ssm-agent >/dev/null 2>&1; then
       dnf -y install amazon-ssm-agent || true
     fi

@@ -123,7 +123,8 @@ module "app_ec2_iam" {
 
   managed_policy_arns = [
     "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
-    "arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess"
+    "arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess",
+    "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   ]
 
   allow_ssm_parameter_read   = true
